@@ -1,0 +1,516 @@
+---
+title: "rstan Notebook"
+repos:
+  CRAN: http://cran.rstudio.com
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+# Introduction to Stan
+
+
+Stan is a program which allows us to run MCMC, as well as other Bayesian Statistical Methods. Stan utilizes the No-U-Turn Sampler (NUTS), which is a variant of Hamiltonian Monte Carlo Simulation approach. Stan is often better than R based simulation methods as it is written in C++, so it is very fast. 
+
+Programs such as WinBUGS, JAGS, and OpenBUGS primarily use the Gibbs sampler which is beneficial as it does not require tuning parameters, but do these approaches do not handle user defined distributions well or sample well from posterior distributions with correlated parameters. These difficulties also hold when using the Metropolis-Hastings Algorithm. 
+
+The aforementioned NUTS method and other alternatives such as the MCMC-DE (*Turner et al,2013*) do handle the short comings of Gibbs Sampling and the MH algorithm. We choose NUTS over MCMC-DE as it requires less precision in tuning, as NUTS does not require tuning parameters. 
+
+
+Stan is a Bayesian modeling program which is implemented by defining likelihood and priors to sample from posterior distributions.
+
+Stan supports the following variable types:
+  +integer
+  +Real numbers
+  +Vectors
+  +matricies
+
+Stan processes instructions sequentially and allows users to utilize standard control flow elements, such as **for** and **while**. We may also use conditionals such as **if-then** and **if-then-else**. 
+
+## Example 1: Built-in Exponential
+
+We wish to model the following:
+$$
+\begin{aligned}
+y & \sim Exponential(\lambda) \\
+\lambda & \sim Gamma(\alpha,\beta) \\
+\alpha & = 1\\
+\beta & = 1
+\end{aligned}
+$$
+
+```{r}
+# Clear the workspace so we don't get any conflicts
+rm(list=ls())
+
+# Install rstan. This step assumes you've followed the toolchain install for stan
+if(!require("rstan")){install.packages("rstan", dependencies = TRUE, type = "source")}
+library("rstan")
+
+# Prevent rerunning previously compiled code
+rstan_options(auto_write = TRUE)
+
+# Enable multicore parallel processing for chains in the rstan package
+options(mc.cores=parallel::detectCores())
+
+# Overwrite rstan files before re-running code
+rstan_options(auto_write = TRUE)
+
+# Install the parallel package for running multiple chains at once
+# links rstan in the parallel via Rstudio
+if(!require("rstudioapi")){install.packages("rstudioapi", dependencies = TRUE, type = "source")}
+library("rstudioapi")
+
+# This package allows us to compute in parallel, which is very useful in mcmc
+if(!require("parallel")){install.packages("parallel", dependencies = TRUE, type = "source")}
+library("parallel")
+
+
+
+# Set the seed for generation for replicability 
+set.seed(1775)
+
+# Write the stan model in a single R Character String.
+model_string <- ("
+data{
+  int LENGTH;
+  vector[LENGTH] Y;
+}
+
+parameters{
+  real<lower=0> lambda;
+}
+
+model{
+  real alpha;
+  real beta;
+  alpha  = 1.0;
+  beta   = 1.0;
+  lambda ~ gamma(alpha,beta);
+  Y ~ exponential(lambda);
+}
+
+generated quantities{
+  real pred;
+  pred = exponential_rng(lambda);
+}
+")
+
+# Prepare the simulation data to run out parameter recovery test
+# Set the lambda parameter to 1
+lambda_param <- 1
+
+# Generate our random sample from the exponential distribution
+exp_sample <- rexp(500,lambda_param)
+
+# Create a variable for length to pass into our Stan model
+len <- length(exp_sample)
+
+# Run the Stan model 
+stan_fit <- rstan::stan(model_code = model_string, #Character string that contains the Stan model
+                        data       = list(Y = exp_sample, LENGTH = len),
+                        warmup     = 750,  # Burn-in 750 iterations before extracting information
+                        iter       = 1500, # Run at most 1500 iterations unless convergence is reached sooner
+                        chains     = 3, #Run 3 Markov chains
+                        cores      = getOption("mc.cores", 1L) # Get the cores we set earlier for parallelization
+                        )
+# Get a summary of the model output from Stan
+print(stan_fit)
+
+# Perform posterior predictions
+mcmc_chain <- as.matrix(stan_fit)
+
+# Create an auto correlation plot
+acf(mcmc_chain[,'lambda'])
+
+# Create a samples vs iteration plot
+stan_trace(stan_fit)
+
+# Posterior preditions
+# The solid density line is the posterior predictive density.
+pred <- mcmc_chain[,'pred']
+hist(exp_sample, probability = TRUE);lines(density(pred))
+
+# Posterior distribution of lambda
+plot(density(mcmc_chain[,'lambda']))
+
+```
+
+
+
+## Example 2: Explicit Exponential
+
+Here we wish the run the same model as *Example 1* but choose to implement the exponential distribution as a user defined function using the likelihood and prior distribution.
+
+```{r}
+# Clear the workspace so we don't get any conflicts
+rm(list=ls())
+
+# Install the rstan package
+if(!require("rstan")){install.packages("rstan", dependencies = TRUE, type = "source")}
+library("rstan")
+
+# Prevent rerunning previously compiled code
+rstan_options(auto_write = TRUE)
+# Enable multicore parallel processing for chains in the rstan package
+options(mc.cores=parallel::detectCores())
+rstan_options(auto_write = TRUE)
+
+# Install the parallel package for running multiple chains at once
+# links rstan in the parallel via Rstudio
+if(!require("rstudioapi")){install.packages("rstudioapi", dependencies = TRUE, type = "source")}
+library("rstudioapi")
+
+if(!require("parallel")){install.packages("parallel", dependencies = TRUE, type = "source")}
+library("parallel")
+
+# Set the seed for generation for replicability 
+set.seed(1775)
+
+# Write the stan model in a single R Character String.
+custom_model <- ('
+
+    functions{
+      real newexp_log(vector x, real lam){
+        vector[num_elements(x)] prob;
+        real lprob;
+        for (i in 1:num_elements(x)){
+          prob[i] = lam*exp(-lam*x[i]);
+        }
+        lprob = sum(log(prob));
+        return lprob;
+      }
+    }
+    
+    data{
+      int LENGTH;
+      vector[LENGTH] Y;
+    }
+    
+    parameters{
+      real<lower=0> lambda;
+    }
+    
+    model{
+      real alpha;
+      real beta;
+      alpha = 1.0;
+      beta = 1.0;
+      lambda ~ gamma(alpha,beta);
+      Y ~ newexp(lambda);
+    }
+    
+    generated quantities{
+      real pred;
+      pred = exponential_rng(lambda);
+    }
+
+    ')
+
+# Prepare the simulation data to run out parameter recovery test
+# Set the lambda parameter to 1
+lambda_param <- 1
+
+# Generate our random sample from the exponential distribution
+exp_sample <- rexp(500,lambda_param)
+
+# Create a variable for length to pass into our Stan model
+len <- length(exp_sample)
+
+# Run the Stan model 
+system.time(
+stan_fit <- rstan::stan(model_code = custom_model, #Character string that contains the Stan model
+                        data       = list(Y = exp_sample, LENGTH = len),
+                        warmup     = 750,  # Burn-in 750 iterations before extracting information
+                        iter       = 1500, # Run at most 1500 iterations unless convergence is reached sooner
+                        chains     = 3, #Run 3 Markov chains
+                        cores      = getOption("mc.cores", 1L)
+                        
+                        ))
+# Get a summary of the model output from Stan
+print(stan_fit)
+
+# Perform posterior predictions
+mcmc_chain <- as.matrix(stan_fit)
+
+# Create an auto correlation plot
+acf(mcmc_chain[,'lambda'])
+
+# Create a samples vs iteration plot
+traceplot(stan_fit)
+
+# Posterior preditions
+# The solid density line is the posterior predictive density.
+pred <- mcmc_chain[,'pred']
+hist(exp_sample, probability = TRUE);lines(density(pred))
+
+# Posterior distribution of lambda
+plot(density(mcmc_chain[,'lambda']))
+```
+
+```{r stan preamble, cache=TRUE}
+options(tidyverse.width = 80)
+# Install the rstan package
+if(!require("rstan")){install.packages("rstan", dependencies = TRUE, type = "source")}
+library("rstan")
+
+# Prevent rerunning previously compiled code
+rstan_options(auto_write = TRUE)
+# Enable multicore parallel processing for chains in the rstan package
+options(mc.cores=parallel::detectCores())
+
+# Install the parallel package for running multiple chains at once
+# links rstan in the parallel via Rstudio
+if(!require("rstudioapi")){install.packages("rstudioapi", dependencies = TRUE, type = "source")}
+library("rstudioapi")
+
+if(!require("parallel")){install.packages("parallel", dependencies = TRUE, type = "source")}
+library("parallel")
+
+if(!require("ggmcmc")){install.packages("ggmcmc", dependencies = TRUE, type = "source")}
+library("ggmcmc")
+
+suppressPackageStartupMessages(suppressWarnings(library("tidyverse", quietly = TRUE)))
+library("tidyverse")
+
+```
+
+```{r Stan Normal generation, cache=TRUE}
+# Set the seed for generation for replicability 
+set.seed(1775)
+
+# Generate the observed data 
+y <- rnorm(100,mean = 0, sd=1)
+
+# compute the MLE for the data
+y_bar <- mean(y)
+y_bar
+
+# Write the stan model in a single R Character String.
+custom_model <- ('
+
+    functions {
+  // Define the non-normalized log probability density function
+  // Takes real values for y, mu, and sigma.
+  real newnormal_lpdf(real y, real mu, real sigma) {
+    return -log(2 * pi()) / 2 - log(sigma) 
+           - square(mu - y) / (2 * sigma^2);
+    }
+  }
+    data {
+      // The number of y values in the observed data
+      int N;
+      // A real vector of the data passed in during the call to rstan
+      real y[N];
+      // Initialize sigma as a real value
+      real<lower=0> sigma;
+          }
+    parameters {
+      real mu;
+    }
+  
+    model {
+      // Prior distribution
+      mu ~ normal(0, 10^6);
+
+      // Likelihood
+      for(n in 1:N){
+        // outcome y[n], with parameters mu and sigma;
+        target +=  newnormal_lpdf(y[n] | mu, sigma);
+        }
+    }
+    ')
+
+# Run the Stan model 
+system.time(
+stan_fit <- rstan::stan(model_code = custom_model, #Character string that contains the Stan model
+                        data       = list(y = y, N = length(y), sigma = 1),
+                        warmup     = 750,  # Burn-in 750 iterations before extracting information
+                        iter       = 1500, # Run at most 1500 iterations unless convergence is reached sooner
+                        chains     = 3, #Run 3 Markov chains
+                        cores      = getOption("mc.cores", 1L),
+                        seed = 1775
+                        
+                        ))
+
+# Get a summary of the model output from Stan
+print(stan_fit)
+
+# Perform posterior predictions
+mcmc_chain <- as.matrix(stan_fit)
+
+# Create an auto correlation plot
+acf(mcmc_chain[,'mu'])
+
+# Create a samples vs iteration plot
+traceplot(stan_fit)
+
+# Posterior preditions
+# The solid density line is the posterior predictive density.
+pred <- mcmc_chain[,'mu']
+hist(y, probability = TRUE);lines(density(pred))
+
+# Posterior distribution of lambda
+plot(density(mcmc_chain[,'mu']))
+
+```
+
+<!-- Example 3 Wu's model for burn data: -->
+```{r, include=FALSE, eval=FALSE}
+# Install the rstan package
+if(!require("rstan")){install.packages("rstan", dependencies = TRUE, type = "source")}
+library("rstan")
+
+# Prevent rerunning previously compiled code
+rstan_options(auto_write = TRUE)
+# Enable multicore parallel processing for chains in the rstan package
+options(mc.cores=parallel::detectCores())
+
+# Install the parallel package for running multiple chains at once
+# links rstan in the parallel via Rstudio
+if(!require("rstudioapi")){install.packages("rstudioapi", dependencies = TRUE, type = "source")}
+library("rstudioapi")
+
+if(!require("parallel")){install.packages("parallel", dependencies = TRUE, type = "source")}
+library("parallel")
+
+suppressPackageStartupMessages(suppressWarnings(library("tidyverse", quietly = TRUE)))
+library("tidyverse")
+
+# Set the seed for generation for replicability 
+set.seed(1775)
+
+# Create a vector with header names
+header_data <- c("patient_id",
+                 "age_years",
+                 "sex",
+                 "race",
+                 "weight",
+                 "date_admitted",
+                 "days_injured",
+                 "hours_injured",
+                 "numerator_third_degree",
+                 "denominator_third_degree",
+                 "burn_type",
+                 "cause", # Needs split
+                 "place",
+                 "pathological_conditions", # Needs split
+                 "prior_respiratory_disease",
+                 "airway_edema",
+                 "sootiness",
+                 "partial_pressure_oxygen",
+                 "partial_pressure_co2",
+                 "ph",
+                 "percent_CbHg",
+                 "primary_topical", 
+                 "secondary_topical", 
+                 "primary_operation",
+                 "secondary_operation",
+                 "other_operation",
+                 "principal_complications",
+                 "secondary_complications",
+                 "other_complications",
+                 "disposition",
+                 "etiology",
+                 "smoke",
+                 "O2",
+                 "CO2",
+                 "acid",
+                 "hemoglobin")
+
+# Read in the data
+burn_data <- read.table(file = "burn.dat.txt", 
+                        col.names = header_data)
+
+# Now we must split the variables for cause and pathological condition as described into the description text file
+
+
+# Check to see if there are any third degree burns cover more than 100 percent of the body area
+filter_burn_data <- burn_data %>%
+  filter(!((numerator_third_degree > denominator_third_degree)|denominator_third_degree == 0))
+
+
+###############################################
+# Fix the values for which all nines have been filled. This requires some assumptions about the dataset. 
+# Age contains no missing values so we omit this line
+# burn_data$age_years[burn_data$age_years == 99] <- NA
+
+#
+burn_data$sex[burn_data$sex == 9] <- NA
+
+# Weight takes values 1,2,3 so we remove 9 as it is representative of missingness
+burn_data$weight[burn_data$weight == 9] <- NA
+
+# Days injury takes values (0 one or more days; 1 = less than one day)
+burn_data$days_injured[burn_data$days_injured == 9] <- NA
+
+# Hours injured before injury has median value 99, since it is more likely that a patient fails to record the number of hours injured before admission than being injured for 99 hours we omit 99 values.
+burn_data$hours_injured[burn_data$hours_injured == 99] <- NA
+
+# Burn type takes values 1,2,3,4 so we omit 9's
+burn_data$burn_type[burn_data$burn_type == 9] <- NA
+
+# Needs split
+burn_data$cause[burn_data$cause == 99] <- NA
+
+# Binary (1-indoor, 2-outdoor) needs 9's omitted 
+burn_data$place[burn_data$place == 9] <- NA
+
+# Usually measured in mmHg so we should remove 99 as it's an extreme outlier
+burn_data$partial_pressure_co2[burn_data$partial_pressure_co2 == 99] <- NA
+
+# Most measures are fairly low, under 200 so I will omit 999 here
+burn_data$ph[burn_data$ph == 999] <- NA
+
+# Record 99 to NA
+burn_data$percent_CbHg[burn_data$percent_CbHg == 99] <- NA
+
+# Topical treatments have 9 coded as "Not indicated"  so I will not alter them
+# burn_data$primary_topical[burn_data$primary_topical == 9] <- NA
+# burn_data$secondary_topical[burn_data$secondary_topical == 9] <- NA
+
+# 999 suggests a patient underwent three cardiac catheretizations which only occurs once. So I will recode it to NA
+burn_data$primary_operation[burn_data$primary_operation == 999] <- NA
+
+# 999 suggests a patient underwent three cardiac catheretizations which only occurs once. So I will recode it to NA
+burn_data$secondary_operation[burn_data$secondary_operation == 999] <- NA
+
+# 999 suggests a patient underwent three cardiac catheretizations which only occurs once. So I will recode it to NA
+burn_data$other_operation[burn_data$other_operation == 999] <- NA
+
+# For complications 99 does not have a meaningful value so we omit them.
+burn_data$principal_complications[burn_data$principal_complications == 99] <- NA
+burn_data$secondary_complications[burn_data$secondary_complications == 99] <- NA
+burn_data$other_complications[burn_data$other_complications == 99] <- NA
+
+# Etiology have valid values 1-flame,2-scald,3-chemical,4-electrical So remove 9's.
+burn_data$etiology[burn_data$etiology == 9] <- NA
+
+# CO2 takes values 0-normal,1-abnormal so we remove 9's.
+burn_data$CO2 [burn_data$CO2 == 9] <- NA
+
+# acid takes values 0-normal,1-abnormal so we remove 9's.
+burn_data$acid[burn_data$acid == 9] <- NA
+
+# hemoglobin values take 0-normal,1-abnormal so we remove 9's.
+burn_data$hemoglobin[burn_data$hemoglobin == 9] <- NA
+
+
+
+jitter_model <- ('
+                 functions{
+                    real jitter_pdf_log(vector x, real lam){
+                        vector[num_elements(x)] prob; // create a vector of the import length to hold the output probabilities.
+                        real lprob; //This variable declaration will hold the log probability value
+                        real floor_x;
+                        
+                        for (i in 1:num_elements(x)){
+                            prob[i] = 
+                        }
+                      
+                    }
+                 }
+                 
+                 ')
+```
