@@ -1,0 +1,15 @@
+base
+knitr
+ggplot2
+StanHeaders
+rstan
+rstudioapi
+dplyr
+tidyr
+ggmcmc
+tidyverse
+tibble
+readr
+purrr
+stringr
+forcats

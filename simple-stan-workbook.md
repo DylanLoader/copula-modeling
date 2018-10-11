@@ -7,12 +7,7 @@ output:
     keep_md: true
   pdf_document: default
 ---
-```{r,include=FALSE}
-# Install knitr
-if(!(require("knitr"))){install.packages("knitr")}
-# Set the cache for all chunks
-knitr::opts_chunk$set(cache = TRUE)
-```
+
 
 # Introduction to Stan
 
@@ -45,7 +40,8 @@ y & \sim Exponential(\lambda) \\
 \end{aligned}
 $$
 
-```{r}
+
+```r
 # Clear the workspace so we don't get any conflicts
 rm(list=ls())
 
@@ -69,6 +65,13 @@ library("rstudioapi")
 
 # This package allows us to compute in parallel, which is very useful in mcmc
 if(!require("parallel")){install.packages("parallel", dependencies = TRUE, type = "source")}
+```
+
+```
+## Loading required package: parallel
+```
+
+```r
 library("parallel")
 
 
@@ -120,27 +123,89 @@ stan_fit <- rstan::stan(model_code = model_string, #Character string that contai
                         chains     = 3, #Run 3 Markov chains
                         cores      = getOption("mc.cores", 1L) # Get the cores we set earlier for parallelization
                         )
+```
+
+```
+## In file included from C:/Users/Admin/Documents/R/win-library/3.5/BH/include/boost/config.hpp:39:0,
+##                  from C:/Users/Admin/Documents/R/win-library/3.5/BH/include/boost/math/tools/config.hpp:13,
+##                  from C:/Users/Admin/Documents/R/win-library/3.5/StanHeaders/include/stan/math/rev/core/var.hpp:7,
+##                  from C:/Users/Admin/Documents/R/win-library/3.5/StanHeaders/include/stan/math/rev/core/gevv_vvv_vari.hpp:5,
+##                  from C:/Users/Admin/Documents/R/win-library/3.5/StanHeaders/include/stan/math/rev/core.hpp:12,
+##                  from C:/Users/Admin/Documents/R/win-library/3.5/StanHeaders/include/stan/math/rev/mat.hpp:4,
+##                  from C:/Users/Admin/Documents/R/win-library/3.5/StanHeaders/include/stan/math.hpp:4,
+##                  from C:/Users/Admin/Documents/R/win-library/3.5/StanHeaders/include/src/stan/model/model_header.hpp:4,
+##                  from file2b404b23c36.cpp:8:
+## C:/Users/Admin/Documents/R/win-library/3.5/BH/include/boost/config/compiler/gcc.hpp:186:0: warning: "BOOST_NO_CXX11_RVALUE_REFERENCES" redefined
+##  #  define BOOST_NO_CXX11_RVALUE_REFERENCES
+##  ^
+## <command-line>:0:0: note: this is the location of the previous definition
+## In file included from C:/Users/Admin/Documents/R/win-library/3.5/StanHeaders/include/stan/math/rev/core.hpp:44:0,
+##                  from C:/Users/Admin/Documents/R/win-library/3.5/StanHeaders/include/stan/math/rev/mat.hpp:4,
+##                  from C:/Users/Admin/Documents/R/win-library/3.5/StanHeaders/include/stan/math.hpp:4,
+##                  from C:/Users/Admin/Documents/R/win-library/3.5/StanHeaders/include/src/stan/model/model_header.hpp:4,
+##                  from file2b404b23c36.cpp:8:
+## C:/Users/Admin/Documents/R/win-library/3.5/StanHeaders/include/stan/math/rev/core/set_zero_all_adjoints.hpp:14:17: warning: 'void stan::math::set_zero_all_adjoints()' defined but not used [-Wunused-function]
+##      static void set_zero_all_adjoints() {
+##                  ^
+```
+
+```r
 # Get a summary of the model output from Stan
 print(stan_fit)
+```
 
+```
+## Inference for Stan model: 27239cc544ecb096bd3151820bc9fa84.
+## 3 chains, each with iter=1500; warmup=750; thin=1; 
+## post-warmup draws per chain=750, total post-warmup draws=2250.
+## 
+##           mean se_mean   sd    2.5%     25%     50%     75%   97.5% n_eff
+## lambda    1.13    0.00 0.05    1.03    1.10    1.13    1.17    1.24   842
+## pred      0.90    0.02 0.92    0.02    0.25    0.63    1.22    3.38  2250
+## lp__   -440.08    0.03 0.73 -442.29 -440.25 -439.78 -439.61 -439.55   841
+##        Rhat
+## lambda    1
+## pred      1
+## lp__      1
+## 
+## Samples were drawn using NUTS(diag_e) at Thu Oct 11 15:00:03 2018.
+## For each parameter, n_eff is a crude measure of effective sample size,
+## and Rhat is the potential scale reduction factor on split chains (at 
+## convergence, Rhat=1).
+```
+
+```r
 # Perform posterior predictions
 mcmc_chain <- as.matrix(stan_fit)
 
 # Create an auto correlation plot
 acf(mcmc_chain[,'lambda'])
+```
 
+![](simple-stan-workbook_files/figure-html/unnamed-chunk-2-1.png)<!-- -->
+
+```r
 # Create a samples vs iteration plot
 stan_trace(stan_fit)
+```
 
+![](simple-stan-workbook_files/figure-html/unnamed-chunk-2-2.png)<!-- -->
+
+```r
 # Posterior preditions
 # The solid density line is the posterior predictive density.
 pred <- mcmc_chain[,'pred']
 hist(exp_sample, probability = TRUE);lines(density(pred))
+```
 
+![](simple-stan-workbook_files/figure-html/unnamed-chunk-2-3.png)<!-- -->
+
+```r
 # Posterior distribution of lambda
 plot(density(mcmc_chain[,'lambda']))
-
 ```
+
+![](simple-stan-workbook_files/figure-html/unnamed-chunk-2-4.png)<!-- -->
 
 
 
@@ -148,7 +213,8 @@ plot(density(mcmc_chain[,'lambda']))
 
 Here we wish the run the same model as *Example 1* but choose to implement the exponential distribution as a user defined function using the likelihood and prior distribution.
 
-```{r}
+
+```r
 # Clear the workspace so we don't get any conflicts
 rm(list=ls())
 
@@ -233,28 +299,97 @@ stan_fit <- rstan::stan(model_code = custom_model, #Character string that contai
                         cores      = getOption("mc.cores", 1L)
                         
                         ))
+```
+
+```
+## In file included from C:/Users/Admin/Documents/R/win-library/3.5/BH/include/boost/config.hpp:39:0,
+##                  from C:/Users/Admin/Documents/R/win-library/3.5/BH/include/boost/math/tools/config.hpp:13,
+##                  from C:/Users/Admin/Documents/R/win-library/3.5/StanHeaders/include/stan/math/rev/core/var.hpp:7,
+##                  from C:/Users/Admin/Documents/R/win-library/3.5/StanHeaders/include/stan/math/rev/core/gevv_vvv_vari.hpp:5,
+##                  from C:/Users/Admin/Documents/R/win-library/3.5/StanHeaders/include/stan/math/rev/core.hpp:12,
+##                  from C:/Users/Admin/Documents/R/win-library/3.5/StanHeaders/include/stan/math/rev/mat.hpp:4,
+##                  from C:/Users/Admin/Documents/R/win-library/3.5/StanHeaders/include/stan/math.hpp:4,
+##                  from C:/Users/Admin/Documents/R/win-library/3.5/StanHeaders/include/src/stan/model/model_header.hpp:4,
+##                  from file2b40627826f0.cpp:8:
+## C:/Users/Admin/Documents/R/win-library/3.5/BH/include/boost/config/compiler/gcc.hpp:186:0: warning: "BOOST_NO_CXX11_RVALUE_REFERENCES" redefined
+##  #  define BOOST_NO_CXX11_RVALUE_REFERENCES
+##  ^
+## <command-line>:0:0: note: this is the location of the previous definition
+## In file included from C:/Users/Admin/Documents/R/win-library/3.5/StanHeaders/include/stan/math/rev/core.hpp:44:0,
+##                  from C:/Users/Admin/Documents/R/win-library/3.5/StanHeaders/include/stan/math/rev/mat.hpp:4,
+##                  from C:/Users/Admin/Documents/R/win-library/3.5/StanHeaders/include/stan/math.hpp:4,
+##                  from C:/Users/Admin/Documents/R/win-library/3.5/StanHeaders/include/src/stan/model/model_header.hpp:4,
+##                  from file2b40627826f0.cpp:8:
+## C:/Users/Admin/Documents/R/win-library/3.5/StanHeaders/include/stan/math/rev/core/set_zero_all_adjoints.hpp:14:17: warning: 'void stan::math::set_zero_all_adjoints()' defined but not used [-Wunused-function]
+##      static void set_zero_all_adjoints() {
+##                  ^
+```
+
+```
+##    user  system elapsed 
+##    1.04    0.33   53.08
+```
+
+```r
 # Get a summary of the model output from Stan
 print(stan_fit)
+```
 
+```
+## Inference for Stan model: 1760631832b6c80dbdd4b7d64055380d.
+## 3 chains, each with iter=1500; warmup=750; thin=1; 
+## post-warmup draws per chain=750, total post-warmup draws=2250.
+## 
+##           mean se_mean   sd    2.5%     25%     50%     75%   97.5% n_eff
+## lambda    1.13    0.00 0.05    1.03    1.10    1.13    1.16    1.23   859
+## pred      0.87    0.02 0.86    0.02    0.26    0.60    1.20    3.28  2250
+## lp__   -440.03    0.02 0.69 -441.97 -440.17 -439.77 -439.60 -439.55  1090
+##        Rhat
+## lambda    1
+## pred      1
+## lp__      1
+## 
+## Samples were drawn using NUTS(diag_e) at Thu Oct 11 15:00:59 2018.
+## For each parameter, n_eff is a crude measure of effective sample size,
+## and Rhat is the potential scale reduction factor on split chains (at 
+## convergence, Rhat=1).
+```
+
+```r
 # Perform posterior predictions
 mcmc_chain <- as.matrix(stan_fit)
 
 # Create an auto correlation plot
 acf(mcmc_chain[,'lambda'])
+```
 
+![](simple-stan-workbook_files/figure-html/unnamed-chunk-3-1.png)<!-- -->
+
+```r
 # Create a samples vs iteration plot
 traceplot(stan_fit)
+```
 
+![](simple-stan-workbook_files/figure-html/unnamed-chunk-3-2.png)<!-- -->
+
+```r
 # Posterior preditions
 # The solid density line is the posterior predictive density.
 pred <- mcmc_chain[,'pred']
 hist(exp_sample, probability = TRUE);lines(density(pred))
+```
 
+![](simple-stan-workbook_files/figure-html/unnamed-chunk-3-3.png)<!-- -->
+
+```r
 # Posterior distribution of lambda
 plot(density(mcmc_chain[,'lambda']))
 ```
 
-```{r stan preamble, cache=TRUE}
+![](simple-stan-workbook_files/figure-html/unnamed-chunk-3-4.png)<!-- -->
+
+
+```r
 options(tidyverse.width = 80)
 # Install the rstan package
 if(!require("rstan")){install.packages("rstan", dependencies = TRUE, type = "source")}
@@ -278,10 +413,10 @@ library("ggmcmc")
 
 suppressPackageStartupMessages(suppressWarnings(library("tidyverse", quietly = TRUE)))
 library("tidyverse")
-
 ```
 
-```{r Stan Normal generation, cache=TRUE}
+
+```r
 # Set the seed for generation for replicability 
 set.seed(1775)
 
@@ -291,7 +426,13 @@ y <- rnorm(100,mean = 0, sd=1)
 # compute the MLE for the data
 y_bar <- mean(y)
 y_bar
+```
 
+```
+## [1] 0.07309292
+```
+
+```r
 # Write the stan model in a single R Character String.
 custom_model <- ('
 
@@ -338,184 +479,92 @@ stan_fit <- rstan::stan(model_code = custom_model, #Character string that contai
                         seed = 1775
                         
                         ))
+```
 
+```
+## In file included from C:/Users/Admin/Documents/R/win-library/3.5/BH/include/boost/config.hpp:39:0,
+##                  from C:/Users/Admin/Documents/R/win-library/3.5/BH/include/boost/math/tools/config.hpp:13,
+##                  from C:/Users/Admin/Documents/R/win-library/3.5/StanHeaders/include/stan/math/rev/core/var.hpp:7,
+##                  from C:/Users/Admin/Documents/R/win-library/3.5/StanHeaders/include/stan/math/rev/core/gevv_vvv_vari.hpp:5,
+##                  from C:/Users/Admin/Documents/R/win-library/3.5/StanHeaders/include/stan/math/rev/core.hpp:12,
+##                  from C:/Users/Admin/Documents/R/win-library/3.5/StanHeaders/include/stan/math/rev/mat.hpp:4,
+##                  from C:/Users/Admin/Documents/R/win-library/3.5/StanHeaders/include/stan/math.hpp:4,
+##                  from C:/Users/Admin/Documents/R/win-library/3.5/StanHeaders/include/src/stan/model/model_header.hpp:4,
+##                  from file2b406ffd7de7.cpp:8:
+## C:/Users/Admin/Documents/R/win-library/3.5/BH/include/boost/config/compiler/gcc.hpp:186:0: warning: "BOOST_NO_CXX11_RVALUE_REFERENCES" redefined
+##  #  define BOOST_NO_CXX11_RVALUE_REFERENCES
+##  ^
+## <command-line>:0:0: note: this is the location of the previous definition
+## In file included from C:/Users/Admin/Documents/R/win-library/3.5/StanHeaders/include/stan/math/rev/core.hpp:44:0,
+##                  from C:/Users/Admin/Documents/R/win-library/3.5/StanHeaders/include/stan/math/rev/mat.hpp:4,
+##                  from C:/Users/Admin/Documents/R/win-library/3.5/StanHeaders/include/stan/math.hpp:4,
+##                  from C:/Users/Admin/Documents/R/win-library/3.5/StanHeaders/include/src/stan/model/model_header.hpp:4,
+##                  from file2b406ffd7de7.cpp:8:
+## C:/Users/Admin/Documents/R/win-library/3.5/StanHeaders/include/stan/math/rev/core/set_zero_all_adjoints.hpp:14:17: warning: 'void stan::math::set_zero_all_adjoints()' defined but not used [-Wunused-function]
+##      static void set_zero_all_adjoints() {
+##                  ^
+```
+
+```
+##    user  system elapsed 
+##    0.67    0.39   52.28
+```
+
+```r
 # Get a summary of the model output from Stan
 print(stan_fit)
+```
 
+```
+## Inference for Stan model: aec37a3d2664f1ebafb6aeb892cb7ccf.
+## 3 chains, each with iter=1500; warmup=750; thin=1; 
+## post-warmup draws per chain=750, total post-warmup draws=2250.
+## 
+##         mean se_mean   sd    2.5%     25%     50%     75%   97.5% n_eff
+## mu      0.07    0.00 0.10   -0.13    0.01    0.07    0.14    0.27   937
+## lp__ -142.23    0.02 0.72 -144.25 -142.41 -141.95 -141.78 -141.74  1195
+##      Rhat
+## mu      1
+## lp__    1
+## 
+## Samples were drawn using NUTS(diag_e) at Thu Oct 11 15:01:53 2018.
+## For each parameter, n_eff is a crude measure of effective sample size,
+## and Rhat is the potential scale reduction factor on split chains (at 
+## convergence, Rhat=1).
+```
+
+```r
 # Perform posterior predictions
 mcmc_chain <- as.matrix(stan_fit)
 
 # Create an auto correlation plot
 acf(mcmc_chain[,'mu'])
+```
 
+![](simple-stan-workbook_files/figure-html/Stan Normal generation-1.png)<!-- -->
+
+```r
 # Create a samples vs iteration plot
 traceplot(stan_fit)
+```
 
+![](simple-stan-workbook_files/figure-html/Stan Normal generation-2.png)<!-- -->
+
+```r
 # Posterior preditions
 # The solid density line is the posterior predictive density.
 pred <- mcmc_chain[,'mu']
 hist(y, probability = TRUE);lines(density(pred))
+```
 
+![](simple-stan-workbook_files/figure-html/Stan Normal generation-3.png)<!-- -->
+
+```r
 # Posterior distribution of lambda
 plot(density(mcmc_chain[,'mu']))
-
 ```
+
+![](simple-stan-workbook_files/figure-html/Stan Normal generation-4.png)<!-- -->
 
 <!-- Example 3 Wu's model for burn data: -->
-```{r, include=FALSE, eval=FALSE}
-# Install the rstan package
-if(!require("rstan")){install.packages("rstan", dependencies = TRUE, type = "source")}
-library("rstan")
 
-# Prevent rerunning previously compiled code
-rstan_options(auto_write = TRUE)
-# Enable multicore parallel processing for chains in the rstan package
-options(mc.cores=parallel::detectCores())
-
-# Install the parallel package for running multiple chains at once
-# links rstan in the parallel via Rstudio
-if(!require("rstudioapi")){install.packages("rstudioapi", dependencies = TRUE, type = "source")}
-library("rstudioapi")
-
-if(!require("parallel")){install.packages("parallel", dependencies = TRUE, type = "source")}
-library("parallel")
-
-suppressPackageStartupMessages(suppressWarnings(library("tidyverse", quietly = TRUE)))
-library("tidyverse")
-
-# Set the seed for generation for replicability 
-set.seed(1775)
-
-# Create a vector with header names
-header_data <- c("patient_id",
-                 "age_years",
-                 "sex",
-                 "race",
-                 "weight",
-                 "date_admitted",
-                 "days_injured",
-                 "hours_injured",
-                 "numerator_third_degree",
-                 "denominator_third_degree",
-                 "burn_type",
-                 "cause", # Needs split
-                 "place",
-                 "pathological_conditions", # Needs split
-                 "prior_respiratory_disease",
-                 "airway_edema",
-                 "sootiness",
-                 "partial_pressure_oxygen",
-                 "partial_pressure_co2",
-                 "ph",
-                 "percent_CbHg",
-                 "primary_topical", 
-                 "secondary_topical", 
-                 "primary_operation",
-                 "secondary_operation",
-                 "other_operation",
-                 "principal_complications",
-                 "secondary_complications",
-                 "other_complications",
-                 "disposition",
-                 "etiology",
-                 "smoke",
-                 "O2",
-                 "CO2",
-                 "acid",
-                 "hemoglobin")
-
-# Read in the data
-burn_data <- read.table(file = "burn.dat.txt", 
-                        col.names = header_data)
-
-# Now we must split the variables for cause and pathological condition as described into the description text file
-
-
-# Check to see if there are any third degree burns cover more than 100 percent of the body area
-filter_burn_data <- burn_data %>%
-  filter(!((numerator_third_degree > denominator_third_degree)|denominator_third_degree == 0))
-
-
-###############################################
-# Fix the values for which all nines have been filled. This requires some assumptions about the dataset. 
-# Age contains no missing values so we omit this line
-# burn_data$age_years[burn_data$age_years == 99] <- NA
-
-#
-burn_data$sex[burn_data$sex == 9] <- NA
-
-# Weight takes values 1,2,3 so we remove 9 as it is representative of missingness
-burn_data$weight[burn_data$weight == 9] <- NA
-
-# Days injury takes values (0 one or more days; 1 = less than one day)
-burn_data$days_injured[burn_data$days_injured == 9] <- NA
-
-# Hours injured before injury has median value 99, since it is more likely that a patient fails to record the number of hours injured before admission than being injured for 99 hours we omit 99 values.
-burn_data$hours_injured[burn_data$hours_injured == 99] <- NA
-
-# Burn type takes values 1,2,3,4 so we omit 9's
-burn_data$burn_type[burn_data$burn_type == 9] <- NA
-
-# Needs split
-burn_data$cause[burn_data$cause == 99] <- NA
-
-# Binary (1-indoor, 2-outdoor) needs 9's omitted 
-burn_data$place[burn_data$place == 9] <- NA
-
-# Usually measured in mmHg so we should remove 99 as it's an extreme outlier
-burn_data$partial_pressure_co2[burn_data$partial_pressure_co2 == 99] <- NA
-
-# Most measures are fairly low, under 200 so I will omit 999 here
-burn_data$ph[burn_data$ph == 999] <- NA
-
-# Record 99 to NA
-burn_data$percent_CbHg[burn_data$percent_CbHg == 99] <- NA
-
-# Topical treatments have 9 coded as "Not indicated"  so I will not alter them
-# burn_data$primary_topical[burn_data$primary_topical == 9] <- NA
-# burn_data$secondary_topical[burn_data$secondary_topical == 9] <- NA
-
-# 999 suggests a patient underwent three cardiac catheretizations which only occurs once. So I will recode it to NA
-burn_data$primary_operation[burn_data$primary_operation == 999] <- NA
-
-# 999 suggests a patient underwent three cardiac catheretizations which only occurs once. So I will recode it to NA
-burn_data$secondary_operation[burn_data$secondary_operation == 999] <- NA
-
-# 999 suggests a patient underwent three cardiac catheretizations which only occurs once. So I will recode it to NA
-burn_data$other_operation[burn_data$other_operation == 999] <- NA
-
-# For complications 99 does not have a meaningful value so we omit them.
-burn_data$principal_complications[burn_data$principal_complications == 99] <- NA
-burn_data$secondary_complications[burn_data$secondary_complications == 99] <- NA
-burn_data$other_complications[burn_data$other_complications == 99] <- NA
-
-# Etiology have valid values 1-flame,2-scald,3-chemical,4-electrical So remove 9's.
-burn_data$etiology[burn_data$etiology == 9] <- NA
-
-# CO2 takes values 0-normal,1-abnormal so we remove 9's.
-burn_data$CO2 [burn_data$CO2 == 9] <- NA
-
-# acid takes values 0-normal,1-abnormal so we remove 9's.
-burn_data$acid[burn_data$acid == 9] <- NA
-
-# hemoglobin values take 0-normal,1-abnormal so we remove 9's.
-burn_data$hemoglobin[burn_data$hemoglobin == 9] <- NA
-
-
-
-jitter_model <- ('
-                 functions{
-                    real jitter_pdf_log(vector x, real lam){
-                        vector[num_elements(x)] prob; // create a vector of the import length to hold the output probabilities.
-                        real lprob; //This variable declaration will hold the log probability value
-                        real floor_x;
-                        
-                        for (i in 1:num_elements(x)){
-                            prob[i] = 
-                        }
-                      
-                    }
-                 }
-                 
-                 ')
-```
