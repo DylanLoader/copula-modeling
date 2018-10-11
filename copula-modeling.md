@@ -1,4 +1,5 @@
 ---
+layout: page
 title: "A Simple Introduction To rstan"
 repos:
   CRAN: http://cran.rstudio.com
